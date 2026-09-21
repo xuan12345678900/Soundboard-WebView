@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>音效播放器</title>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+        input, textarea, select {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        .fixed-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 150;
+            width: 100%;
+        }
+        .top-bar {
+            background: linear-gradient(135deg, #4a6cf7 0%, #667eea 100%);
+            color: white;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(74,108,247,0.3);
+        }
+        .top-bar h1 { font-size: 18px; font-weight: 600; }
+        .top-bar .stats { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+        .icon-btn {
+            background: rgba(255,255,255,0.2);
+            border: none; color: white;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .icon-btn:active { background: rgba(255,255,255,0.35); }
+        .top-actions { display: flex; gap: 8px; }
+        .icon-btn.stop-btn {
+            background: #e74c3c;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(231,76,60,0.4);
+        }
+        .icon-btn.stop-btn:active { background: #c0392b; }
+
+        .search-wrap {
+            padding: 12px 16px;
+            background: #f5f6fa;
+        }
+        .search-bar {
+            display: flex; align-items: center;
+            background: white;
+            border-radius: 24px;
+            padding: 8px 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .search-bar input {
+            flex: 1; border: none; outline: none;
+            font-size: 14px; background: transparent;
+            font-family: inherit; margin-left: 8px;
+        }
+        .search-bar .icon { font-size: 16px; opacity: 0.5; }
+
+        .category-tabs {
+            display: flex;
+            overflow-x: auto;
+            padding: 12px 12px 10px;
+            gap: 8px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .category-tabs::-webkit-scrollbar { display: none; }
+        .tab {
+            flex-shrink: 0;
+            padding: 6px 14px;
+            background: white;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #eee;
+            white-space: nowrap;
+        }
+        .tab.active {
+            background: #4a6cf7;
+            color: white;
+            border-color: #4a6cf7;
+        }
+        .tab:active { transform: scale(0.96); }
+
+        .content {
+            padding: 0 12px 100px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .section-title {
+            font-size: 13px;
+            color: #888;
+            margin: 16px 4px 8px;
+            font-weight: 500;
+            padding-left: 4px;
+            border-left: 3px solid #4a6cf7;
+        }
+        .sound-item {
+            display: flex;
+            align-items: center;
+            background: white;
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin: 6px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .sound-item:active {
+            background: #f0f3ff;
+            transform: scale(0.99);
+        }
+        .sound-item.playing {
+            background: #eef2ff;
+            border-left: 4px solid #4a6cf7;
+        }
+        .sound-info { flex: 1; min-width: 0; }
+        .sound-name {
+            font-size: 15px; color: #222;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .sound-meta { font-size: 11px; color: #aaa; margin-top: 3px; }
+        .sound-actions { display: flex; gap: 4px; margin-left: 8px; }
+        .mini-btn {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: #f0f2f5;
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .mini-btn:active { background: #4a6cf7; color: white; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+        .empty-state p { font-size: 14px; line-height: 1.6; }
+
+        .bottom-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+            background: white;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
+            display: flex; gap: 10px;
+            z-index: 80;
+        }
+        .primary-btn {
+            flex: 1; padding: 12px;
+            background: linear-gradient(135deg, #4a6cf7, #667eea);
+            color: white; border: none; border-radius: 12px;
+            font-size: 15px; font-weight: 500;
+            cursor: pointer; font-family: inherit;
+        }
+        .primary-btn:active { transform: scale(0.97); opacity: 0.9; }
+        .secondary-btn {
+            flex: 1; padding: 12px;
+            background: #f0f2f5; color: #555;
+            border: none; border-radius: 12px;
+            font-size: 15px; font-weight: 500;
+            cursor: pointer; font-family: inherit;
+        }
+        .secondary-btn:active { background: #e4e7ec; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal {
+            background: white;
+            border-radius: 16px 16px 0 0;
+            width: 100%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideUp 0.25s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; background: white; z-index: 1;
+        }
+        .modal-header h3 { font-size: 16px; font-weight: 600; }
+        .modal-body { padding: 16px; }
+        .modal-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #f0f0f0;
+            display: flex; gap: 10px;
+            position: sticky; bottom: 0; background: white;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block; font-size: 13px; color: #666; margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            width: 100%; padding: 10px 12px;
+            border: 1px solid #e0e0e0; border-radius: 8px;
+            font-size: 14px; font-family: inherit;
+            outline: none; background: white;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: #4a6cf7; }
+        .list-item {
+            display: flex; align-items: center;
+            padding: 12px; border-radius: 8px;
+            margin-bottom: 6px; background: #f9fafb;
+        }
+        .list-item .name { flex: 1; font-size: 14px; }
+        .list-item .actions { display: flex; gap: 6px; }
+        .rename-input {
+            flex: 1; padding: 6px 10px;
+            border: 1px solid #4a6cf7; border-radius: 6px;
+            font-size: 14px; font-family: inherit; outline: none;
+            min-width: 0;
+        }
+        .danger-btn {
+            background: #fee2e2; color: #dc2626;
+            border: none; padding: 6px 12px;
+            border-radius: 6px; font-size: 12px;
+            cursor: pointer; font-family: inherit;
+        }
+        .danger-btn:active { background: #fecaca; }
+        .danger-btn.armed { background: #dc2626; color: white; }
+        .cat-delete-panel {
+            display: none;
+            margin: 10px 0;
+            padding: 12px;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            background: #fff5f5;
+        }
+        .cat-delete-panel.show { display: block; }
+        .cat-delete-panel .panel-title {
+            font-size: 14px; font-weight: 600; color: #dc2626;
+            margin-bottom: 10px;
+        }
+        .cat-delete-panel .panel-actions { display: flex; gap: 8px; margin-top: 4px; }
+        .edit-btn {
+            background: #dbeafe; color: #2563eb;
+            border: none; padding: 6px 12px;
+            border-radius: 6px; font-size: 12px;
+            cursor: pointer; font-family: inherit;
+        }
+        .edit-btn:active { background: #bfdbfe; }
+        .add-row { display: flex; gap: 8px; margin-top: 10px; }
+        .add-row input {
+            flex: 1; padding: 10px 12px;
+            border: 1px solid #e0e0e0; border-radius: 8px;
+            font-size: 14px; font-family: inherit; outline: none;
+        }
+        .add-row button {
+            padding: 10px 16px;
+            background: #4a6cf7; color: white;
+            border: none; border-radius: 8px;
+            font-size: 14px; cursor: pointer; font-family: inherit;
+        }
+
+        .toast {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 300;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .toast.show { opacity: 1; }
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+    <div class="fixed-header">
+        <div class="top-bar">
+            <div>
+                <h1>🎵 音效播放器</h1>
+                <div class="stats" id="stats-text">加载中...</div>
+            </div>
+            <div class="top-actions">
+                <button class="icon-btn stop-btn" id="stop-btn" title="停止所有播放" style="display:none;">⏹</button>
+                <button class="icon-btn" id="play-mode-btn" title="播放模式：叠加/打断">🔀</button>
+            </div>
+        </div>
+
+        <div class="search-wrap">
+            <div class="search-bar">
+                <span class="icon">🔍</span>
+                <input type="text" id="search-input" placeholder="搜索音效..." />
+            </div>
+        </div>
+    </div>
+
+    <div class="category-tabs" id="category-tabs"></div>
+
+    <div class="content" id="content"></div>
+
+    <div class="bottom-bar" id="bottom-bar">
+        <button class="secondary-btn" id="import-btn">📁 导入音效</button>
+        <button class="primary-btn" id="cat-manage-btn">📂 分类管理</button>
+    </div>
+
+    <input type="file" id="file-input" accept="audio/*" multiple />
+
+    <!-- 音效操作弹窗 -->
+    <div class="modal-overlay" id="sound-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>音效操作</h3>
+                <button class="icon-btn" style="background:#f0f0f0;color:#666;" onclick="closeModal('sound-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>音效名称</label>
+                    <input type="text" id="sound-name-input" />
+                </div>
+                <div class="form-group">
+                    <label>所属分类</label>
+                    <select id="sound-category-select"></select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="danger-btn" style="padding:12px;flex:1;font-size:14px;" id="sound-delete-btn">删除音效</button>
+                <button class="primary-btn" id="sound-save-btn">保存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分类管理弹窗 -->
+    <div class="modal-overlay" id="category-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>分类管理</h3>
+                <button class="icon-btn" style="background:#f0f0f0;color:#666;" onclick="closeModal('category-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="category-list"></div>
+                <div class="cat-delete-panel" id="cat-delete-panel">
+                    <div class="panel-title" id="cat-delete-title">删除分类</div>
+                    <div class="form-group">
+                        <label>该分类下的音效</label>
+                        <select id="cat-sound-action">
+                            <option value="move">移动到其他分类</option>
+                            <option value="delete">连同音效一起删除</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="cat-move-group">
+                        <label>移动到</label>
+                        <select id="cat-move-select"></select>
+                    </div>
+                    <div class="panel-actions">
+                        <button class="secondary-btn" style="padding:10px;flex:1;font-size:13px;" id="cat-delete-cancel">取消</button>
+                        <button class="danger-btn" style="padding:10px;flex:1;font-size:13px;" id="cat-delete-confirm">确认删除分类</button>
+                    </div>
+                </div>
+                <div class="add-row">
+                    <input type="text" id="new-category-input" placeholder="新分类名称..." />
+                    <button id="add-category-btn">添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入音效弹窗 -->
+    <div class="modal-overlay" id="import-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>导入音效</h3>
+                <button class="icon-btn" style="background:#f0f0f0;color:#666;" onclick="closeImportModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p id="import-count-text" style="font-size:14px;color:#555;margin-bottom:12px;"></p>
+                <div class="form-group">
+                    <label>导入到分类</label>
+                    <select id="import-category-select"></select>
+                </div>
+                <div class="form-group" id="import-new-cat-group" style="display:none;">
+                    <label>新分类名称</label>
+                    <input type="text" id="import-new-cat-input" placeholder="输入新分类名称" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="secondary-btn" style="padding:12px;flex:1;font-size:14px;" id="import-cancel-btn">取消</button>
+                <button class="primary-btn" id="import-confirm-btn">开始导入</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // ============================================================
+    // 内置音效（直接从 assets 播放，不经过 IndexedDB）
+    // ============================================================
+
+    var BUILTIN_SOUNDS = [];
+
+    var DEFAULT_CATEGORIES = [];
+
+    // ============================================================
+    // 数据层：IndexedDB 存用户导入的音频，LocalStorage 存配置
+    // ============================================================
+
+    var DB_NAME = 'SoundPlayerDB';
+    var DB_VERSION = 1;
+    var STORE_SOUNDS = 'sounds';
+    var LS_KEY = 'sound_player_config_v4';
+    var LS_KEY_V3 = 'sound_player_config_v3';
+    var LS_KEY_V2 = 'sound_player_config_v2';
+
+    var db = null;
+    var config = null; // { categories: [...], sounds: [...] }
+    var currentCategory = 'all';
+    var playOverlap = true;  // true=叠加(一音多源), false=打断(重播前先停当前实例)
+    var playingIds = {}; // soundId -> array of playing sources (支持重叠播放)
+    var audioPool = {}; // soundId -> array of preloaded audio elements (HTML Audio 回退用)
+    var audioCtx = null;      // Web Audio 低延迟上下文
+    var audioBuffers = {};    // soundId -> 解码后的 AudioBuffer
+    var useWebAudio = false;
+    var suppressClick = false; // fast-tap 触发后抑制后续 click，防止双播
+
+    // ---- IndexedDB ----
+    function openDB() {
+        return new Promise(function(resolve, reject) {
+            try {
+                var req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = function(e) {
+                    var database = e.target.result;
+                    if (!database.objectStoreNames.contains(STORE_SOUNDS)) {
+                        database.createObjectStore(STORE_SOUNDS, { keyPath: 'id' });
+                    }
+                };
+                req.onsuccess = function(e) {
+                    db = e.target.result;
+                    resolve(db);
+                };
+                req.onerror = function(e) {
+                    reject(e.target.error);
+                };
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    function saveSoundBlob(id, blob) {
+        return new Promise(function(resolve, reject) {
+            if (!db) { reject(new Error('db not ready')); return; }
+            try {
+                var tx = db.transaction(STORE_SOUNDS, 'readwrite');
+                var store = tx.objectStore(STORE_SOUNDS);
+                store.put({ id: id, blob: blob });
+                tx.oncomplete = function() { resolve(); };
+                tx.onerror = function(e) { reject(e.target.error); };
+            } catch (e) { reject(e); }
+        });
+    }
+
+    function getSoundBlob(id) {
+        return new Promise(function(resolve, reject) {
+            if (!db) { resolve(null); return; }
+            try {
+                var tx = db.transaction(STORE_SOUNDS, 'readonly');
+                var store = tx.objectStore(STORE_SOUNDS);
+                var req = store.get(id);
+                req.onsuccess = function() {
+                    resolve(req.result ? req.result.blob : null);
+                };
+                req.onerror = function(e) { reject(e.target.error); };
+            } catch (e) { reject(e); }
+        });
+    }
+
+    function deleteSoundBlob(id) {
+        return new Promise(function(resolve, reject) {
+            if (!db) { resolve(); return; }
+            try {
+                var tx = db.transaction(STORE_SOUNDS, 'readwrite');
+                var store = tx.objectStore(STORE_SOUNDS);
+                store.delete(id);
+                tx.oncomplete = function() { resolve(); };
+                tx.onerror = function(e) { reject(e.target.error); };
+            } catch (e) { reject(e); }
+        });
+    }
+
+    // ---- LocalStorage ----
+    // v3: sounds 数组统一存放内置与导入音效，均可编辑/删除/换分类
+    function builtinSoundEntries() {
+        return BUILTIN_SOUNDS.map(function(s) {
+            return {
+                id: s.id,
+                name: s.name,
+                categoryId: s.cat,
+                file: s.file,
+                builtin: true,
+                size: s.size || 0
+            };
+        });
+    }
+
+    // v2/v3 → v4：内置音效按新默认清单重建，保留用户导入音效与自建分类
+    function migrateConfig(old) {
+        var legacyDefaultIds = ['cat_otto', 'cat_nm', 'cat_zmd', 'cat_e', 'cat_dz', 'cat_other'];
+
+        var cats = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+        (old.categories || []).forEach(function(c) {
+            var isUserCreated = legacyDefaultIds.indexOf(c.id) === -1 &&
+                                !cats.some(function(x) { return x.id === c.id; });
+            if (isUserCreated) cats.push(c);
+        });
+        cats.forEach(function(c, i) { c.order = i; });
+
+        var sounds = builtinSoundEntries();
+        var oldSounds = old.sounds || old.customSounds || [];
+        oldSounds.forEach(function(s) {
+            if (!s.id || s.id.indexOf('usr_') !== 0) return;
+            if (!cats.some(function(c) { return c.id === s.categoryId; })) {
+                s.categoryId = 'cat_other';
+            }
+            sounds.push({
+                id: s.id,
+                name: s.name,
+                categoryId: s.categoryId,
+                file: null,
+                builtin: false,
+                size: s.size || 0
+            });
+        });
+        return { categories: cats, sounds: sounds };
+    }
+
+    function loadConfig() {
+        var raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+            try {
+                config = JSON.parse(raw);
+                if (config.categories && config.sounds) {
+                    return;
+                }
+            } catch (e) {}
+        }
+        // 旧版本迁移（v3 优先，其次 v2）
+        [LS_KEY_V3, LS_KEY_V2].forEach(function(oldKey) {
+            if (config) return;
+            var oldRaw = localStorage.getItem(oldKey);
+            if (!oldRaw) return;
+            try {
+                config = migrateConfig(JSON.parse(oldRaw));
+                saveConfig();
+            } catch (e) {
+                config = null;
+            }
+        });
+        if (config) return;
+        config = {
+            categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+            sounds: builtinSoundEntries()
+        };
+        saveConfig();
+    }
+
+    function saveConfig() {
+        localStorage.setItem(LS_KEY, JSON.stringify(config));
+    }
+
+    // 获取所有音效（内置 + 用户导入，统一存储）
+    function getAllSounds() {
+        return config.sounds;
+    }
+
+    // ============================================================
+    // 播放 - Web Audio 低延迟（预解码 AudioBuffer），HTML Audio 回退
+    // ============================================================
+
+    // ---- Web Audio 基础设施 ----
+    function initAudioContext() {
+        try {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            audioCtx = new AC({ latencyHint: 'interactive' });
+            useWebAudio = true;
+        } catch (e) {
+            useWebAudio = false;
+        }
+    }
+
+    // Android 自动播放策略：需要用户手势后 resume
+    function resumeAudioContext() {
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+    document.addEventListener('touchstart', resumeAudioContext, { passive: true });
+    document.addEventListener('mousedown', resumeAudioContext, { passive: true });
+
+    function loadArrayBuffer(src) {
+        return new Promise(function(resolve, reject) {
+            try {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', src, true);
+                xhr.responseType = 'arraybuffer';
+                xhr.onload = function() {
+                    if (xhr.status === 200 || xhr.status === 0) resolve(xhr.response);
+                    else reject(new Error('HTTP ' + xhr.status));
+                };
+                xhr.onerror = function() { reject(new Error('load error')); };
+                xhr.send();
+            } catch (e) { reject(e); }
+        });
+    }
+
+    function decodeToBuffer(soundId, arrayBuffer) {
+        return new Promise(function(resolve, reject) {
+            try {
+                audioCtx.decodeAudioData(arrayBuffer, function(buffer) {
+                    audioBuffers[soundId] = buffer;
+                    resolve(buffer);
+                }, function(err) { reject(err); });
+            } catch (e) { reject(e); }
+        });
+    }
+
+    function blobToArrayBuffer(blob) {
+        if (blob.arrayBuffer) return blob.arrayBuffer();
+        return new Promise(function(resolve, reject) {
+            var fr = new FileReader();
+            fr.onload = function() { resolve(fr.result); };
+            fr.onerror = function() { reject(fr.error); };
+            fr.readAsArrayBuffer(blob);
+        });
+    }
+
+    // 解码音效（内置从 assets 加载，自定义从 IndexedDB 读取），结果缓存在 audioBuffers
+    function decodeSound(sound) {
+        if (audioBuffers[sound.id]) return Promise.resolve(audioBuffers[sound.id]);
+        var p = sound.builtin
+            ? loadArrayBuffer(sound.file)
+            : getSoundBlob(sound.id).then(function(blob) {
+                if (!blob) return null;
+                return blobToArrayBuffer(blob);
+            });
+        return p.then(function(buf) {
+            if (!buf) return null;
+            return decodeToBuffer(sound.id, buf);
+        }).catch(function() {
+            return null;
+        });
+    }
+
+    // ---- 停止某一音效的全部播放实例（打断模式下重播前调用） ----
+    function stopSoundInstances(soundId) {
+        var players = playingIds[soundId] || [];
+        players.forEach(function(player) {
+            try {
+                player.onended = null;
+                if (typeof player.stop === 'function') {
+                    player.stop();      // AudioBufferSourceNode
+                } else if (typeof player.pause === 'function') {
+                    player.pause();    // HTML Audio 元素
+                    try { player.currentTime = 0; } catch (e) {}
+                }
+            } catch (e) {}
+        });
+        // 清空实例数组但保留引用，便于下一次播放直接 push
+        playingIds[soundId] = playingIds[soundId] || [];
+        playingIds[soundId].length = 0;
+    }
+
+    // ---- Web Audio 播放：AudioBufferSourceNode.start(0) 立即出声 ----
+    function playSoundWebAudio(soundId, buffer) {
+        if (!playOverlap) stopSoundInstances(soundId);
+        var source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+        source.onended = function() {
+            var arr = playingIds[soundId] || [];
+            var idx = arr.indexOf(source);
+            if (idx > -1) arr.splice(idx, 1);
+            if (arr.length === 0) delete playingIds[soundId];
+            updatePlayingUI();
+        };
+        source.start(0);
+        playingIds[soundId].push(source);
+    }
+
+    // ---- HTML Audio 回退路径（解码失败或无 Web Audio 时） ----
+    function getAudioFromPool(soundId, src) {
+        if (audioPool[soundId] && audioPool[soundId].length > 0) {
+            return audioPool[soundId].pop();
+        }
+        var audio = new Audio(src);
+        audio.preload = 'auto';
+        audio.load();
+        return audio;
+    }
+
+    function refillPool(soundId, src) {
+        if (!audioPool[soundId]) audioPool[soundId] = [];
+        while (audioPool[soundId].length < 2) {
+            var audio = new Audio(src);
+            audio.preload = 'auto';
+            audio.load();
+            audioPool[soundId].push(audio);
+        }
+    }
+
+    function playSoundHtml(soundId, sound) {
+        if (!playOverlap) stopSoundInstances(soundId);
+        if (sound.builtin) {
+            var audio = getAudioFromPool(soundId, sound.file);
+            setTimeout(function() { refillPool(soundId, sound.file); }, 0);
+            try { audio.currentTime = 0; } catch (e) {}
+            audio.play().then(function() {
+                playingIds[soundId].push(audio);
+                updatePlayingUI();
+            }).catch(function(err) {
+                console.error('播放失败', err);
+                showToast('播放失败');
+            });
+            audio.onended = function() {
+                var idx = playingIds[soundId].indexOf(audio);
+                if (idx > -1) playingIds[soundId].splice(idx, 1);
+                if (playingIds[soundId].length === 0) delete playingIds[soundId];
+                updatePlayingUI();
+                if (audioPool[soundId] && audioPool[soundId].length < 3) {
+                    try { audio.currentTime = 0; } catch (e) {}
+                    audioPool[soundId].push(audio);
+                }
+            };
+        } else {
+            getSoundBlob(soundId).then(function(blob) {
+                if (!blob) {
+                    showToast('音频文件不存在');
+                    return;
+                }
+                var url = URL.createObjectURL(blob);
+                var audio = new Audio(url);
+                audio.preload = 'auto';
+                audio.play().then(function() {
+                    playingIds[soundId].push(audio);
+                    updatePlayingUI();
+                }).catch(function() {
+                    showToast('播放失败');
+                });
+                audio.onended = function() {
+                    var idx = playingIds[soundId].indexOf(audio);
+                    if (idx > -1) playingIds[soundId].splice(idx, 1);
+                    if (playingIds[soundId].length === 0) delete playingIds[soundId];
+                    updatePlayingUI();
+                    URL.revokeObjectURL(url);
+                };
+            }).catch(function() {
+                showToast('读取失败');
+            });
+        }
+    }
+
+    // ---- 播放入口 ----
+    function playSound(soundId) {
+        var allSounds = getAllSounds();
+        var sound = allSounds.find(function(s) { return s.id === soundId; });
+        if (!sound) return;
+
+        if (!playingIds[soundId]) {
+            playingIds[soundId] = [];
+        }
+
+        // 首选 Web Audio：已预解码则零解码延迟立即播放
+        if (useWebAudio && audioCtx) {
+            resumeAudioContext();
+            var buffer = audioBuffers[soundId];
+            if (buffer) {
+                playSoundWebAudio(soundId, buffer);
+                updatePlayingUI();
+                return;
+            }
+            // 未预解码完成：解码后播放并缓存（仅首次点击有解码耗时）
+            decodeSound(sound).then(function(buf) {
+                if (buf) {
+                    playSoundWebAudio(soundId, buf);
+                    updatePlayingUI();
+                } else {
+                    playSoundHtml(soundId, sound);
+                }
+            });
+            return;
+        }
+
+        playSoundHtml(soundId, sound);
+    }
+
+    // ---- 预加载：优先预解码内置音效；无 Web Audio 时退回 HTML Audio 池 ----
+    var PRELOAD_MAX_BYTES = 4 * 1024 * 1024; // 大文件（如 Hi-Res BGM）跳过预解码，点击时按需解码
+    function preloadBuiltinSounds() {
+        var builtins = config.sounds.filter(function(s) { return s.builtin; });
+        if (useWebAudio && audioCtx) {
+            var queue = builtins.filter(function(s) { return !s.size || s.size <= PRELOAD_MAX_BYTES; });
+            function next() {
+                if (queue.length === 0) return;
+                var s = queue.shift();
+                if (audioBuffers[s.id]) { next(); return; }
+                decodeSound(s).then(function() {
+                    setTimeout(next, 10);
+                });
+            }
+            next();
+        } else {
+            builtins.forEach(function(s) {
+                try { refillPool(s.id, s.file); } catch (e) {}
+            });
+        }
+    }
+
+    function isAnythingPlaying() {
+        return Object.keys(playingIds).some(function(k) {
+            return playingIds[k] && playingIds[k].length > 0;
+        });
+    }
+
+    function updatePlayingUI() {
+        var items = document.querySelectorAll('.sound-item');
+        items.forEach(function(item) {
+            var id = item.getAttribute('data-id');
+            if (playingIds[id] && playingIds[id].length > 0) {
+                item.classList.add('playing');
+            } else {
+                item.classList.remove('playing');
+            }
+        });
+        // 停止按钮：有任一播放实例时显示（含不在当前列表的音效）
+        var stopBtn = document.getElementById('stop-btn');
+        if (stopBtn) {
+            stopBtn.style.display = isAnythingPlaying() ? 'flex' : 'none';
+        }
+    }
+
+    // 一键停止所有正在播放的音频（Web Audio 源 + HTML Audio 回退）
+    function stopAllSounds() {
+        if (!isAnythingPlaying()) return;
+
+        Object.keys(playingIds).forEach(function(soundId) {
+            var players = playingIds[soundId] || [];
+            players.forEach(function(player) {
+                try {
+                    player.onended = null; // 阻止停止后异步触发清理回调
+                    if (typeof player.stop === 'function') {
+                        player.stop();      // AudioBufferSourceNode
+                    } else if (typeof player.pause === 'function') {
+                        player.pause();    // HTML Audio 元素
+                        try { player.currentTime = 0; } catch (e) {}
+                    }
+                } catch (e) {}
+            });
+        });
+        playingIds = {};
+        updatePlayingUI();
+        showToast('已停止全部播放');
+    }
+
+    document.getElementById('stop-btn').addEventListener('click', stopAllSounds);
+
+    // ============================================================
+    // UI 渲染
+    // ============================================================
+
+    function getCategoryById(id) {
+        return config.categories.find(function(c) { return c.id === id; });
+    }
+
+    function getSoundsByCategory(catId) {
+        var all = getAllSounds();
+        if (catId === 'all') return all;
+        return all.filter(function(s) { return s.categoryId === catId; });
+    }
+
+    function getSortedCategories() {
+        return config.categories.slice().sort(function(a, b) {
+            return a.order - b.order;
+        });
+    }
+
+    function renderCategories() {
+        var tabs = document.getElementById('category-tabs');
+        var cats = getSortedCategories();
+        var all = getAllSounds();
+
+        var html = '<div class="tab ' + (currentCategory === 'all' ? 'active' : '') + '" data-cat="all">全部 (' + all.length + ')</div>';
+        cats.forEach(function(cat) {
+            var count = getSoundsByCategory(cat.id).length;
+            html += '<div class="tab ' + (currentCategory === cat.id ? 'active' : '') +
+                    '" data-cat="' + cat.id + '">' + escapeHtml(cat.name) +
+                    ' (' + count + ')</div>';
+        });
+        tabs.innerHTML = html;
+
+        tabs.querySelectorAll('.tab').forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                currentCategory = tab.getAttribute('data-cat');
+                renderCategories();
+                renderSounds();
+            });
+        });
+    }
+
+    function renderSounds() {
+        var container = document.getElementById('content');
+        var searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
+
+        var sounds = getSoundsByCategory(currentCategory);
+        if (searchQuery) {
+            sounds = sounds.filter(function(s) {
+                return s.name.toLowerCase().indexOf(searchQuery) >= 0;
+            });
+        }
+
+        // 更新统计
+        var totalSounds = getAllSounds().length;
+        var totalCats = config.categories.length;
+        document.getElementById('stats-text').textContent = totalSounds + ' 个音效 · ' + totalCats + ' 个分类';
+
+        if (sounds.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">🎵</div><p>' +
+                (searchQuery ? '没有找到匹配的音效' : '这个分类还没有音效<br>点击下方"导入音效"添加吧') +
+                '</p></div>';
+            return;
+        }
+
+        if (currentCategory === 'all') {
+            var cats = getSortedCategories();
+            var html = '';
+            cats.forEach(function(cat) {
+                var catSounds = sounds.filter(function(s) { return s.categoryId === cat.id; });
+                if (catSounds.length === 0) return;
+                html += '<div class="section-title">' + escapeHtml(cat.name) + '（' + catSounds.length + '）</div>';
+                catSounds.forEach(function(s) {
+                    html += renderSoundItem(s);
+                });
+            });
+            container.innerHTML = html;
+        } else {
+            var html = '';
+            sounds.forEach(function(s) {
+                html += renderSoundItem(s);
+            });
+            container.innerHTML = html;
+        }
+
+        container.querySelectorAll('.sound-item').forEach(function(item) {
+            var id = item.getAttribute('data-id');
+            var startX = 0, startY = 0, startTime = 0, tapValid = false, longPress = false, longPressTimer = null;
+
+            // 长按 450ms：打开音效编辑窗口（长按后不再触发播放）
+            item.addEventListener('touchstart', function(e) {
+                if (e.target.closest('.mini-btn')) return;
+                var t = e.touches[0];
+                startX = t.clientX; startY = t.clientY; startTime = Date.now();
+                tapValid = true; longPress = false;
+                longPressTimer = setTimeout(function() {
+                    longPress = true;
+                    openSoundModal(id);
+                }, 450);
+            }, { passive: true });
+
+            item.addEventListener('touchmove', function(e) {
+                if (!longPressTimer) return;
+                var t = e.touches[0];
+                var dx = t.clientX - startX, dy = t.clientY - startY;
+                if (Math.sqrt(dx * dx + dy * dy) > 12) {
+                    clearTimeout(longPressTimer); longPressTimer = null;
+                }
+            }, { passive: true });
+
+            item.addEventListener('touchend', function(e) {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                if (longPress) { longPress = false; tapValid = false; return; }
+                if (!tapValid) return;
+                tapValid = false;
+                if (e.target.closest('.mini-btn')) return;
+                var t = e.changedTouches[0];
+                var dx = t.clientX - startX, dy = t.clientY - startY;
+                var dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 12 && (Date.now() - startTime) < 600) {
+                    suppressClick = true;
+                    setTimeout(function() { suppressClick = false; }, 500);
+                    playSound(id);
+                }
+            });
+
+            item.addEventListener('click', function(e) {
+                if (e.target.closest('.mini-btn')) return;
+                if (longPress || suppressClick) return;
+                playSound(id);
+            });
+        });
+    }
+
+    function renderSoundItem(sound) {
+        var cat = getCategoryById(sound.categoryId);
+        var catName = cat ? cat.name : '未分类';
+        var sizeStr = sound.size ? formatSize(sound.size) : (sound.builtin ? '内置' : '');
+
+        var html = '<div class="sound-item" data-id="' + sound.id + '">';
+        html += '<div class="sound-info">';
+        html += '<div class="sound-name">' + escapeHtml(sound.name) + '</div>';
+        html += '<div class="sound-meta">' + catName + ' · ' + sizeStr + '</div>';
+        html += '</div>';
+        html += '</div>';
+        return html;
+    }
+
+    function formatSize(bytes) {
+        if (!bytes) return '0 B';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    // ============================================================
+    // 弹窗
+    // ============================================================
+
+    function showToast(msg) {
+        var toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(function() {
+            toast.classList.remove('show');
+        }, 1500);
+    }
+
+    function openModal(id) {
+        document.getElementById(id).classList.add('show');
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('show');
+    }
+
+    document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) overlay.classList.remove('show');
+        });
+    });
+
+    // ---- 音效编辑 ----
+    var editingSoundId = null;
+    var deleteArmed = false; // 二次确认状态（替代 WebView 无效的 confirm()）
+    var deleteArmTimer = null;
+
+    function resetDeleteBtn() {
+        deleteArmed = false;
+        if (deleteArmTimer) { clearTimeout(deleteArmTimer); deleteArmTimer = null; }
+        var deleteBtn = document.getElementById('sound-delete-btn');
+        deleteBtn.textContent = '删除音效';
+        deleteBtn.style.background = '';
+    }
+
+    function openSoundModal(soundId) {
+        editingSoundId = soundId;
+        var sound = config.sounds.find(function(s) { return s.id === soundId; });
+        if (!sound) return;
+
+        document.getElementById('sound-name-input').value = sound.name;
+
+        var select = document.getElementById('sound-category-select');
+        select.innerHTML = '';
+        getSortedCategories().forEach(function(cat) {
+            var opt = document.createElement('option');
+            opt.value = cat.id;
+            opt.textContent = cat.name;
+            if (cat.id === sound.categoryId) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        // 内置与导入音效均可删除（删除内置只是从列表移除）
+        resetDeleteBtn();
+        var deleteBtn = document.getElementById('sound-delete-btn');
+        deleteBtn.style.display = 'block';
+
+        openModal('sound-modal');
+    }
+
+    document.getElementById('sound-save-btn').addEventListener('click', function() {
+        if (!editingSoundId) return;
+
+        var newName = document.getElementById('sound-name-input').value.trim();
+        var newCat = document.getElementById('sound-category-select').value;
+        if (!newName) {
+            showToast('名称不能为空');
+            return;
+        }
+
+        var s = config.sounds.find(function(x) { return x.id === editingSoundId; });
+        if (!s) return;
+        s.name = newName;
+        s.categoryId = newCat;
+        saveConfig();
+
+        closeModal('sound-modal');
+        renderCategories();
+        renderSounds();
+        showToast('已保存');
+    });
+
+    document.getElementById('sound-delete-btn').addEventListener('click', function() {
+        if (!editingSoundId) return;
+        var s = config.sounds.find(function(x) { return x.id === editingSoundId; });
+        if (!s) return;
+
+        // 两段式确认，替代 WebView 中不生效的 confirm()
+        if (!deleteArmed) {
+            deleteArmed = true;
+            var deleteBtn = document.getElementById('sound-delete-btn');
+            deleteBtn.textContent = '⚠ 再点一次确认删除';
+            deleteBtn.style.background = '#e74c3c';
+            deleteArmTimer = setTimeout(resetDeleteBtn, 2500);
+            return;
+        }
+        resetDeleteBtn();
+
+        function removeFromList() {
+            config.sounds = config.sounds.filter(function(x) { return x.id !== editingSoundId; });
+            // 清理播放与解码缓存，避免幽灵条目
+            delete audioBuffers[editingSoundId];
+            delete audioPool[editingSoundId];
+            delete playingIds[editingSoundId];
+            saveConfig();
+            closeModal('sound-modal');
+            renderCategories();
+            renderSounds();
+            showToast('已删除');
+        }
+
+        if (s.builtin) {
+            // 内置音效：仅从列表移除（音频文件仍保留在 APK 内）
+            removeFromList();
+        } else {
+            // 导入音效：同时清理 IndexedDB blob
+            deleteSoundBlob(editingSoundId).then(removeFromList).catch(function() {
+                removeFromList();
+            });
+        }
+    });
+
+    // ---- 分类管理 ----
+    var armedCatId = null;
+    var armCatTimer = null;
+    var deletingCatId = null;
+
+    function openCategoryModal() {
+        armedCatId = null;
+        deletingCatId = null;
+        document.getElementById('cat-delete-panel').classList.remove('show');
+        renderCategoryList();
+        openModal('category-modal');
+    }
+
+    function renderCategoryList() {
+        var list = document.getElementById('category-list');
+        var cats = getSortedCategories();
+
+        var html = '';
+        cats.forEach(function(cat) {
+            var count = getSoundsByCategory(cat.id).length;
+            var isLast = cats.length === 1;
+            html += '<div class="list-item" data-cat-id="' + cat.id + '">';
+            html += '<span class="name">' + escapeHtml(cat.name) + ' <span style="color:#999;font-size:12px;">(' + count + ')</span></span>';
+            html += '<div class="actions">';
+            html += '<button class="edit-btn" onclick="renameCategory(\'' + cat.id + '\')">重命名</button>';
+            if (!isLast) {
+                var armed = armedCatId === cat.id;
+                html += '<button class="danger-btn' + (armed ? ' armed' : '') + '" onclick="deleteCategory(\'' + cat.id + '\')">' +
+                        (armed ? '确认删除' : '删除') + '</button>';
+            }
+            html += '</div></div>';
+        });
+        list.innerHTML = html;
+    }
+
+    // 行内重命名（替代 WebView 中不生效的 prompt()）
+    window.renameCategory = function(catId) {
+        var cat = getCategoryById(catId);
+        if (!cat) return;
+        var row = document.querySelector('.list-item[data-cat-id="' + catId + '"]');
+        if (!row) return;
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'rename-input';
+        input.value = cat.name;
+        var nameSpan = row.querySelector('.name');
+        nameSpan.innerHTML = '';
+        nameSpan.appendChild(input);
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+
+        function commit() {
+            var newName = input.value.trim();
+            if (newName && newName !== cat.name) {
+                cat.name = newName;
+                saveConfig();
+                renderCategories();
+                renderSounds();
+                showToast('已重命名');
+            }
+            renderCategoryList();
+        }
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') commit();
+        });
+        input.addEventListener('blur', function() {
+            setTimeout(commit, 100);
+        });
+    };
+
+    // 所有分类（含默认）均可删除；至少保留一个分类
+    window.deleteCategory = function(catId) {
+        var cat = getCategoryById(catId);
+        if (!cat) return;
+        if (config.categories.length <= 1) {
+            showToast('至少保留一个分类');
+            return;
+        }
+
+        var count = getSoundsByCategory(catId).length;
+        if (count > 0) {
+            // 有音效：弹面板选择移动或连带删除
+            showCatDeletePanel(catId);
+            return;
+        }
+
+        // 空分类：两段式确认
+        if (armedCatId !== catId) {
+            armedCatId = catId;
+            renderCategoryList();
+            if (armCatTimer) clearTimeout(armCatTimer);
+            armCatTimer = setTimeout(function() {
+                armedCatId = null;
+                if (document.getElementById('category-modal').classList.contains('show')) {
+                    renderCategoryList();
+                }
+            }, 2500);
+            return;
+        }
+        armedCatId = null;
+        if (armCatTimer) { clearTimeout(armCatTimer); armCatTimer = null; }
+
+        config.categories = config.categories.filter(function(c) { return c.id !== catId; });
+        if (currentCategory === catId) currentCategory = 'all';
+        saveConfig();
+        renderCategoryList();
+        renderCategories();
+        renderSounds();
+        showToast('已删除');
+    };
+
+    function showCatDeletePanel(catId) {
+        deletingCatId = catId;
+        var cat = getCategoryById(catId);
+        var count = getSoundsByCategory(catId).length;
+        document.getElementById('cat-delete-title').textContent =
+            '删除分类「' + cat.name + '」（含 ' + count + ' 个音效）';
+
+        var moveSelect = document.getElementById('cat-move-select');
+        moveSelect.innerHTML = '';
+        var others = config.categories.filter(function(c) { return c.id !== catId; });
+        others.forEach(function(c) {
+            var opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name;
+            moveSelect.appendChild(opt);
+        });
+
+        document.getElementById('cat-sound-action').value = 'move';
+        document.getElementById('cat-move-group').style.display = 'block';
+        document.getElementById('cat-delete-panel').classList.add('show');
+    }
+
+    document.getElementById('cat-sound-action').addEventListener('change', function() {
+        document.getElementById('cat-move-group').style.display =
+            this.value === 'move' ? 'block' : 'none';
+    });
+
+    document.getElementById('cat-delete-cancel').addEventListener('click', function() {
+        deletingCatId = null;
+        document.getElementById('cat-delete-panel').classList.remove('show');
+    });
+
+    document.getElementById('cat-delete-confirm').addEventListener('click', function() {
+        if (!deletingCatId) return;
+        var catId = deletingCatId;
+        var action = document.getElementById('cat-sound-action').value;
+        var moveTarget = document.getElementById('cat-move-select').value;
+
+        if (action === 'move') {
+            if (!moveTarget) {
+                showToast('没有可移动到的分类');
+                return;
+            }
+            config.sounds.forEach(function(s) {
+                if (s.categoryId === catId) s.categoryId = moveTarget;
+            });
+        } else {
+            // 连同音效一起删除
+            config.sounds.filter(function(s) { return s.categoryId === catId; }).forEach(function(s) {
+                if (!s.builtin) {
+                    deleteSoundBlob(s.id).catch(function() {});
+                }
+                delete audioBuffers[s.id];
+                delete audioPool[s.id];
+                delete playingIds[s.id];
+            });
+            config.sounds = config.sounds.filter(function(s) { return s.categoryId !== catId; });
+        }
+
+        config.categories = config.categories.filter(function(c) { return c.id !== catId; });
+        if (currentCategory === catId) currentCategory = 'all';
+        saveConfig();
+        deletingCatId = null;
+        document.getElementById('cat-delete-panel').classList.remove('show');
+        renderCategoryList();
+        renderCategories();
+        renderSounds();
+        showToast('分类已删除');
+    });
+
+    document.getElementById('add-category-btn').addEventListener('click', function() {
+        var input = document.getElementById('new-category-input');
+        var name = input.value.trim();
+        if (!name) {
+            showToast('请输入分类名称');
+            return;
+        }
+        if (config.categories.some(function(c) { return c.name === name; })) {
+            showToast('分类已存在');
+            return;
+        }
+        var newCat = {
+            id: 'cat_' + Date.now(),
+            name: name,
+            order: config.categories.length
+        };
+        config.categories.push(newCat);
+        saveConfig();
+        input.value = '';
+        renderCategoryList();
+        renderCategories();
+        showToast('已添加');
+    });
+
+    // ============================================================
+    // 导入音效
+    // ============================================================
+
+    document.getElementById('import-btn').addEventListener('click', function() {
+        document.getElementById('file-input').click();
+    });
+
+    // 选完文件后先弹窗让用户选择目标分类，再批量导入
+    var pendingImportFiles = null;
+
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        var files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        // 先过滤出音频文件并转为数组（清空 input 后 FileList 会失效）
+        var valid = [];
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            var isAudio = (f.type && f.type.indexOf('audio/') === 0) ||
+                          /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(f.name);
+            if (isAudio) valid.push(f);
+        }
+        e.target.value = '';
+
+        if (valid.length === 0) {
+            showToast('未找到音频文件');
+            return;
+        }
+        pendingImportFiles = valid;
+        openImportModal(valid.length);
+    });
+
+    function openImportModal(count) {
+        document.getElementById('import-count-text').textContent = '将导入 ' + count + ' 个音频文件';
+
+        var select = document.getElementById('import-category-select');
+        select.innerHTML = '';
+        getSortedCategories().forEach(function(cat) {
+            var opt = document.createElement('option');
+            opt.value = cat.id;
+            opt.textContent = cat.name;
+            select.appendChild(opt);
+        });
+        var newOpt = document.createElement('option');
+        newOpt.value = '__new__';
+        newOpt.textContent = '＋ 新建分类';
+        select.appendChild(newOpt);
+        select.value = getSortedCategories()[0] ? getSortedCategories()[0].id : '__new__';
+
+        document.getElementById('import-new-cat-group').style.display = 'none';
+        document.getElementById('import-new-cat-input').value = '';
+        openModal('import-modal');
+    }
+
+    document.getElementById('import-category-select').addEventListener('change', function() {
+        document.getElementById('import-new-cat-group').style.display =
+            this.value === '__new__' ? 'block' : 'none';
+    });
+
+    function closeImportModal() {
+        pendingImportFiles = null;
+        closeModal('import-modal');
+    }
+
+    document.getElementById('import-cancel-btn').addEventListener('click', closeImportModal);
+
+    document.getElementById('import-confirm-btn').addEventListener('click', function() {
+        if (!pendingImportFiles || pendingImportFiles.length === 0) {
+            closeImportModal();
+            return;
+        }
+
+        var select = document.getElementById('import-category-select');
+        var catId = select.value;
+
+        if (catId === '__new__') {
+            var newName = document.getElementById('import-new-cat-input').value.trim();
+            if (!newName) {
+                showToast('请输入新分类名称');
+                return;
+            }
+            if (config.categories.some(function(c) { return c.name === newName; })) {
+                showToast('分类已存在');
+                return;
+            }
+            var newCat = {
+                id: 'cat_' + Date.now(),
+                name: newName,
+                order: config.categories.length
+            };
+            config.categories.push(newCat);
+            catId = newCat.id;
+        }
+
+        var files = pendingImportFiles;
+        pendingImportFiles = null;
+        closeModal('import-modal');
+        importFiles(files, catId);
+    });
+
+    function importFiles(files, catId) {
+        var count = files.length;
+        var imported = 0;
+        var index = 0;
+
+        showToast('正在导入 ' + count + ' 个...');
+
+        function nextFile() {
+            if (index >= count) {
+                saveConfig();
+                // 导入完成后切到目标分类并清空搜索，直接看到新音效
+                currentCategory = catId;
+                document.getElementById('search-input').value = '';
+                renderCategories();
+                renderSounds();
+                showToast('成功导入 ' + imported + ' 个');
+                return;
+            }
+
+            var file = files[index];
+            index++;
+
+            var name = file.name.replace(/\.[^.]+$/, '');
+            var id = 'usr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+
+            saveSoundBlob(id, file).then(function() {
+                config.sounds.push({
+                    id: id,
+                    name: name,
+                    categoryId: catId,
+                    file: null,
+                    builtin: false,
+                    size: file.size
+                });
+                imported++;
+                setTimeout(nextFile, 20);
+            }).catch(function() {
+                setTimeout(nextFile, 20);
+            });
+        }
+
+        nextFile();
+    }
+
+    // ============================================================
+    // 播放模式切换：叠加（同音效可同时多开）/ 打断（重播立即打断旧实例）
+    // ============================================================
+
+    var playModeBtn = document.getElementById('play-mode-btn');
+    function updatePlayModeBtn() {
+        playModeBtn.textContent = playOverlap ? '🔀' : '⏮';
+        playModeBtn.style.background = playOverlap ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)';
+        showToast(playOverlap ? '叠加模式' : '打断模式');
+    }
+    playModeBtn.addEventListener('click', function() {
+        playOverlap = !playOverlap;
+        updatePlayModeBtn();
+    });
+
+    // ============================================================
+    // 其他
+    // ============================================================
+
+    document.getElementById('cat-manage-btn').addEventListener('click', function() {
+        openCategoryModal();
+    });
+
+    document.getElementById('search-input').addEventListener('input', function() {
+        renderSounds();
+    });
+
+    // ============================================================
+    // 初始化
+    // ============================================================
+
+    // 固定头部：为 body 补偿 padding，让内容从标题栏下方开始
+    function layoutHeader() {
+        var header = document.querySelector('.fixed-header');
+        if (header) {
+            document.body.style.paddingTop = header.offsetHeight + 'px';
+        }
+    }
+
+    function init() {
+        // 打开 IndexedDB（用户导入音效用，失败不影响内置音效）
+        openDB().catch(function(e) {
+            console.warn('IndexedDB 打开失败，用户导入功能不可用', e);
+        });
+
+        // 创建低延迟 Web Audio 上下文（挂起态，首次触摸时 resume）
+        initAudioContext();
+
+        loadConfig();
+        layoutHeader();
+        renderCategories();
+        renderSounds();
+
+        // 后台预解码内置音效，点击时零解码延迟
+        setTimeout(preloadBuiltinSounds, 200);
+    }
+
+    window.addEventListener('resize', layoutHeader);
+    window.addEventListener('load', init);
+    </script>
+</body>
+</html>
