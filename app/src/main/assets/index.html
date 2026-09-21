@@ -8,6 +8,10 @@
         * {
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -18,6 +22,12 @@
             min-height: 100vh;
             color: #333;
             overflow-x: hidden;
+        }
+        input, textarea, select {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
         }
         .fixed-header {
             position: fixed;
@@ -313,7 +323,7 @@
             </div>
             <div class="top-actions">
                 <button class="icon-btn stop-btn" id="stop-btn" title="停止所有播放" style="display:none;">⏹</button>
-                <button class="icon-btn" id="manage-btn" title="管理">⚙️</button>
+                <button class="icon-btn" id="play-mode-btn" title="播放模式：叠加/打断">🔀</button>
             </div>
         </div>
 
@@ -427,96 +437,9 @@
     // 内置音效（直接从 assets 播放，不经过 IndexedDB）
     // ============================================================
 
-    var BUILTIN_SOUNDS = [
-        { id: 'builtin_000', name: 'CCB', cat: 'cat_otto', file: 'audio/audio_000.wav', size: 219702, builtin: true },
-        { id: 'builtin_001', name: '你在装什么', cat: 'cat_otto', file: 'audio/audio_001.wav', size: 1459302, builtin: true },
-        { id: 'builtin_002', name: '你是SB吗？', cat: 'cat_otto', file: 'audio/audio_002.wav', size: 447990, builtin: true },
-        { id: 'builtin_003', name: '冲刺', cat: 'cat_otto', file: 'audio/audio_003.wav', size: 167558, builtin: true },
-        { id: 'builtin_004', name: '冲！', cat: 'cat_otto', file: 'audio/audio_004.wav', size: 124022, builtin: true },
-        { id: 'builtin_005', name: '卡在这里了', cat: 'cat_otto', file: 'audio/audio_005.wav', size: 323334, builtin: true },
-        { id: 'builtin_006', name: '吃柠檬开大！', cat: 'cat_otto', file: 'audio/audio_006.wav', size: 551110, builtin: true },
-        { id: 'builtin_007', name: '大家好啊，我是说的道理', cat: 'cat_otto', file: 'audio/audio_007.flac', size: 1782597, builtin: true },
-        { id: 'builtin_008', name: '开大啊！', cat: 'cat_otto', file: 'audio/audio_008.wav', size: 238950, builtin: true },
-        { id: 'builtin_009', name: '我喜欢你 你喜欢我', cat: 'cat_otto', file: 'audio/audio_009.wav', size: 530838, builtin: true },
-        { id: 'builtin_010', name: '我草你马！', cat: 'cat_otto', file: 'audio/audio_010.wav', size: 483766, builtin: true },
-        { id: 'builtin_011', name: '我重拾你的梦 全损', cat: 'cat_otto', file: 'audio/audio_011.wav', size: 662206, builtin: true },
-        { id: 'builtin_012', name: '我重拾你的梦', cat: 'cat_otto', file: 'audio/audio_012.wav', size: 656358, builtin: true },
-        { id: 'builtin_013', name: '来', cat: 'cat_otto', file: 'audio/audio_013.wav', size: 104198, builtin: true },
-        { id: 'builtin_014', name: '棍哥唐笑', cat: 'cat_otto', file: 'audio/audio_014.wav', size: 918662, builtin: true },
-        { id: 'builtin_015', name: '电棍唐笑2', cat: 'cat_otto', file: 'audio/audio_015.wav', size: 579246, builtin: true },
-        { id: 'builtin_016', name: '给你马B闪', cat: 'cat_otto', file: 'audio/audio_016.wav', size: 1379222, builtin: true },
-        { id: 'builtin_017', name: '给老子死！', cat: 'cat_otto', file: 'audio/audio_017.wav', size: 324206, builtin: true },
-        { id: 'builtin_018', name: '诶你怎么死了？', cat: 'cat_otto', file: 'audio/audio_018.wav', size: 442230, builtin: true },
-        { id: 'builtin_019', name: '队友呢？救一下啊！', cat: 'cat_otto', file: 'audio/audio_019.wav', size: 845062, builtin: true },
-        { id: 'builtin_020', name: '上膛', cat: 'cat_other', file: 'audio/audio_020.flac', size: 20846, builtin: true },
-        { id: 'builtin_021', name: '凹↑', cat: 'cat_other', file: 'audio/audio_021.flac', size: 22399, builtin: true },
-        { id: 'builtin_022', name: '叮', cat: 'cat_other', file: 'audio/audio_022.flac', size: 48498, builtin: true },
-        { id: 'builtin_023', name: '叹', cat: 'cat_other', file: 'audio/audio_023.flac', size: 71607, builtin: true },
-        { id: 'builtin_024', name: '呜↗', cat: 'cat_other', file: 'audio/audio_024.flac', size: 23858, builtin: true },
-        { id: 'builtin_025', name: '开枪', cat: 'cat_other', file: 'audio/audio_025.flac', size: 64944, builtin: true },
-        { id: 'builtin_026', name: '我的斗笠气歪了', cat: 'cat_other', file: 'audio/audio_026.flac', size: 124467, builtin: true },
-        { id: 'builtin_027', name: '柯莱星顿的枪声“谁开的枪”', cat: 'cat_other', file: 'audio/audio_027.flac', size: 106538, builtin: true },
-        { id: 'builtin_028', name: '熊大快跑音效', cat: 'cat_other', file: 'audio/audio_028.flac', size: 1411576, builtin: true },
-        { id: 'builtin_029', name: '🐔🌲🔊🗣️🔥🔥🔥YAAAAAAAAAH', cat: 'cat_other', file: 'audio/audio_029.flac', size: 627613, builtin: true },
-        { id: 'builtin_030', name: '咕咕嘎嘎1', cat: 'cat_gugu', file: 'audio/audio_030.flac', size: 132557, builtin: true },
-        { id: 'builtin_031', name: '咕咕嘎嘎2', cat: 'cat_gugu', file: 'audio/audio_031.flac', size: 110746, builtin: true },
-        { id: 'builtin_032', name: '咕咕嘎嘎3', cat: 'cat_gugu', file: 'audio/audio_032.flac', size: 172696, builtin: true },
-        { id: 'builtin_033', name: '咕咕嘎嘎4', cat: 'cat_gugu', file: 'audio/audio_033.flac', size: 135793, builtin: true },
-        { id: 'builtin_034', name: '咕咕嘎嘎5', cat: 'cat_gugu', file: 'audio/audio_034.flac', size: 252804, builtin: true },
-        { id: 'builtin_035', name: '咕咕嘎嘎原声', cat: 'cat_gugu', file: 'audio/audio_035.flac', size: 1406444, builtin: true },
-        { id: 'builtin_036', name: '叫——————', cat: 'cat_dog', file: 'audio/audio_036.flac', size: 424842, builtin: true },
-        { id: 'builtin_037', name: '叫叫叫', cat: 'cat_dog', file: 'audio/audio_037.flac', size: 60275, builtin: true },
-        { id: 'builtin_038', name: '大狗', cat: 'cat_dog', file: 'audio/audio_038.flac', size: 27454, builtin: true },
-        { id: 'builtin_039', name: '大狗大狗大狗。。。叫叫叫', cat: 'cat_dog', file: 'audio/audio_039.flac', size: 961609, builtin: true },
-        { id: 'builtin_040', name: '在燃什么', cat: 'cat_valorant', file: 'audio/audio_040.flac', size: 1249975, builtin: true },
-        { id: 'builtin_041', name: '当心眼睛！', cat: 'cat_valorant', file: 'audio/audio_041.mp3', size: 35643, builtin: true },
-        { id: 'builtin_042', name: '迷核震荡小球', cat: 'cat_valorant', file: 'audio/audio_042.flac', size: 532925, builtin: true },
-        { id: 'builtin_043', name: 'ber', cat: 'cat_zmd', file: 'audio/audio_043.flac', size: 20961, builtin: true },
-        { id: 'builtin_044', name: '“ARKNIGHTS”《明日方舟：终末地》登陆界面 BGM【Hi-Res百万级录音棚试听】', cat: 'cat_zmd', file: 'audio/audio_044.flac', size: 11355105, builtin: true },
-        { id: 'builtin_045', name: '当1', cat: 'cat_zmd', file: 'audio/audio_045.flac', size: 29898, builtin: true },
-        { id: 'builtin_046', name: '当2', cat: 'cat_zmd', file: 'audio/audio_046.flac', size: 27461, builtin: true },
-        { id: 'builtin_047', name: '当3', cat: 'cat_zmd', file: 'audio/audio_047.flac', size: 23659, builtin: true },
-        { id: 'builtin_048', name: '→↘↓↓↓↓~', cat: 'cat_priest', file: 'audio/audio_048.flac', size: 240260, builtin: true },
-        { id: 'builtin_049', name: '↘→↗~~~', cat: 'cat_priest', file: 'audio/audio_049.flac', size: 126911, builtin: true },
-        { id: 'builtin_050', name: '冰冰冰', cat: 'cat_priest', file: 'audio/audio_050.flac', size: 16749, builtin: true },
-        { id: 'builtin_051', name: '叭哈哈哈哈', cat: 'cat_priest', file: 'audio/audio_051.flac', size: 169972, builtin: true },
-        { id: 'builtin_052', name: '呦吼吼吼吼吼', cat: 'cat_priest', file: 'audio/audio_052.flac', size: 185330, builtin: true },
-        { id: 'builtin_053', name: '哇↗奥↘', cat: 'cat_priest', file: 'audio/audio_053.flac', size: 98459, builtin: true },
-        { id: 'builtin_054', name: '哇啊~（娜老师）', cat: 'cat_priest', file: 'audio/audio_054.flac', size: 50462, builtin: true },
-        { id: 'builtin_055', name: '哇奥', cat: 'cat_priest', file: 'audio/audio_055.flac', size: 38407, builtin: true },
-        { id: 'builtin_056', name: '哎哟我去', cat: 'cat_priest', file: 'audio/audio_056.flac', size: 59556, builtin: true },
-        { id: 'builtin_057', name: '啊啊哦', cat: 'cat_priest', file: 'audio/audio_057.flac', size: 53077, builtin: true },
-        { id: 'builtin_058', name: '啊啊啊啊啊啊啊', cat: 'cat_priest', file: 'audio/audio_058.flac', size: 109279, builtin: true },
-        { id: 'builtin_059', name: '啊额', cat: 'cat_priest', file: 'audio/audio_059.flac', size: 74091, builtin: true },
-        { id: 'builtin_060', name: '嗯？', cat: 'cat_priest', file: 'audio/audio_060.flac', size: 23902, builtin: true },
-        { id: 'builtin_061', name: '爆炸', cat: 'cat_priest', file: 'audio/audio_061.flac', size: 76985, builtin: true },
-        { id: 'builtin_062', name: '砍碎1', cat: 'cat_priest', file: 'audio/audio_062.flac', size: 83186, builtin: true },
-        { id: 'builtin_063', name: '砍碎2', cat: 'cat_priest', file: 'audio/audio_063.flac', size: 72484, builtin: true },
-        { id: 'builtin_064', name: '耶————', cat: 'cat_priest', file: 'audio/audio_064.flac', size: 325929, builtin: true },
-        { id: 'builtin_065', name: '越鹿越帅哦（迷你世界僵尸）', cat: 'cat_priest', file: 'audio/audio_065.flac', size: 90851, builtin: true },
-        { id: 'builtin_066', name: '（boss战吼）', cat: 'cat_priest', file: 'audio/audio_066.flac', size: 208079, builtin: true },
-        { id: 'builtin_067', name: '（小孩笑）', cat: 'cat_priest', file: 'audio/audio_067.flac', size: 136760, builtin: true },
-        { id: 'builtin_068', name: '（男人尖叫）', cat: 'cat_priest', file: 'audio/audio_068.flac', size: 134500, builtin: true },
-        { id: 'builtin_069', name: '（窜稀）', cat: 'cat_priest', file: 'audio/audio_069.flac', size: 117563, builtin: true },
-        { id: 'builtin_070', name: '饿1', cat: 'cat_e', file: 'audio/audio_070.flac', size: 90808, builtin: true },
-        { id: 'builtin_071', name: '饿2', cat: 'cat_e', file: 'audio/audio_071.flac', size: 84391, builtin: true },
-        { id: 'builtin_072', name: '饿3', cat: 'cat_e', file: 'audio/audio_072.flac', size: 88214, builtin: true },
-        { id: 'builtin_073', name: '饿4', cat: 'cat_e', file: 'audio/audio_073.flac', size: 71877, builtin: true },
-        { id: 'builtin_074', name: '饿5', cat: 'cat_e', file: 'audio/audio_074.flac', size: 106678, builtin: true },
-        { id: 'builtin_075', name: '饿6', cat: 'cat_e', file: 'audio/audio_075.flac', size: 124610, builtin: true },
-        { id: 'builtin_076', name: '饿7', cat: 'cat_e', file: 'audio/audio_076.flac', size: 82839, builtin: true }
-    ];
+    var BUILTIN_SOUNDS = [];
 
-    var DEFAULT_CATEGORIES = [
-        { id: 'cat_otto', name: 'otto', order: 0 },
-        { id: 'cat_other', name: '其他', order: 1 },
-        { id: 'cat_gugu', name: '咕咕嘎嘎', order: 2 },
-        { id: 'cat_dog', name: '大狗', order: 3 },
-        { id: 'cat_valorant', name: '无畏契约', order: 4 },
-        { id: 'cat_zmd', name: '终末地', order: 5 },
-        { id: 'cat_priest', name: '老牧师', order: 6 },
-        { id: 'cat_e', name: '饿', order: 7 }
-    ];
+    var DEFAULT_CATEGORIES = [];
 
     // ============================================================
     // 数据层：IndexedDB 存用户导入的音频，LocalStorage 存配置
@@ -532,7 +455,7 @@
     var db = null;
     var config = null; // { categories: [...], sounds: [...] }
     var currentCategory = 'all';
-    var manageMode = false;
+    var playOverlap = true;  // true=叠加(一音多源), false=打断(重播前先停当前实例)
     var playingIds = {}; // soundId -> array of playing sources (支持重叠播放)
     var audioPool = {}; // soundId -> array of preloaded audio elements (HTML Audio 回退用)
     var audioCtx = null;      // Web Audio 低延迟上下文
@@ -769,8 +692,28 @@
         });
     }
 
+    // ---- 停止某一音效的全部播放实例（打断模式下重播前调用） ----
+    function stopSoundInstances(soundId) {
+        var players = playingIds[soundId] || [];
+        players.forEach(function(player) {
+            try {
+                player.onended = null;
+                if (typeof player.stop === 'function') {
+                    player.stop();      // AudioBufferSourceNode
+                } else if (typeof player.pause === 'function') {
+                    player.pause();    // HTML Audio 元素
+                    try { player.currentTime = 0; } catch (e) {}
+                }
+            } catch (e) {}
+        });
+        // 清空实例数组但保留引用，便于下一次播放直接 push
+        playingIds[soundId] = playingIds[soundId] || [];
+        playingIds[soundId].length = 0;
+    }
+
     // ---- Web Audio 播放：AudioBufferSourceNode.start(0) 立即出声 ----
     function playSoundWebAudio(soundId, buffer) {
+        if (!playOverlap) stopSoundInstances(soundId);
         var source = audioCtx.createBufferSource();
         source.buffer = buffer;
         source.connect(audioCtx.destination);
@@ -807,6 +750,7 @@
     }
 
     function playSoundHtml(soundId, sound) {
+        if (!playOverlap) stopSoundInstances(soundId);
         if (sound.builtin) {
             var audio = getAudioFromPool(soundId, sound.file);
             setTimeout(function() { refillPool(soundId, sound.file); }, 0);
@@ -1048,20 +992,35 @@
 
         container.querySelectorAll('.sound-item').forEach(function(item) {
             var id = item.getAttribute('data-id');
-            var startX = 0, startY = 0, startTime = 0, tapValid = false;
+            var startX = 0, startY = 0, startTime = 0, tapValid = false, longPress = false, longPressTimer = null;
 
-            // fast-tap：touchend 立即触发，省去 click 事件的额外等待
+            // 长按 450ms：打开音效编辑窗口（长按后不再触发播放）
             item.addEventListener('touchstart', function(e) {
-                if (e.target.closest('.mini-btn') || manageMode) return;
+                if (e.target.closest('.mini-btn')) return;
                 var t = e.touches[0];
                 startX = t.clientX; startY = t.clientY; startTime = Date.now();
-                tapValid = true;
+                tapValid = true; longPress = false;
+                longPressTimer = setTimeout(function() {
+                    longPress = true;
+                    openSoundModal(id);
+                }, 450);
+            }, { passive: true });
+
+            item.addEventListener('touchmove', function(e) {
+                if (!longPressTimer) return;
+                var t = e.touches[0];
+                var dx = t.clientX - startX, dy = t.clientY - startY;
+                if (Math.sqrt(dx * dx + dy * dy) > 12) {
+                    clearTimeout(longPressTimer); longPressTimer = null;
+                }
             }, { passive: true });
 
             item.addEventListener('touchend', function(e) {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                if (longPress) { longPress = false; tapValid = false; return; }
                 if (!tapValid) return;
                 tapValid = false;
-                if (e.target.closest('.mini-btn') || manageMode) return;
+                if (e.target.closest('.mini-btn')) return;
                 var t = e.changedTouches[0];
                 var dx = t.clientX - startX, dy = t.clientY - startY;
                 var dist = Math.sqrt(dx * dx + dy * dy);
@@ -1074,17 +1033,8 @@
 
             item.addEventListener('click', function(e) {
                 if (e.target.closest('.mini-btn')) return;
-                if (manageMode) return;
-                if (suppressClick) return;
+                if (longPress || suppressClick) return;
                 playSound(id);
-            });
-        });
-
-        container.querySelectorAll('.mini-btn.edit-sound').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                var id = btn.getAttribute('data-id');
-                openSoundModal(id);
             });
         });
     }
@@ -1099,11 +1049,6 @@
         html += '<div class="sound-name">' + escapeHtml(sound.name) + '</div>';
         html += '<div class="sound-meta">' + catName + ' · ' + sizeStr + '</div>';
         html += '</div>';
-        if (manageMode) {
-            html += '<div class="sound-actions">';
-            html += '<button class="mini-btn edit-sound" data-id="' + sound.id + '" title="编辑">✏️</button>';
-            html += '</div>';
-        }
         html += '</div>';
         return html;
     }
@@ -1152,15 +1097,6 @@
     var editingSoundId = null;
     var deleteArmed = false; // 二次确认状态（替代 WebView 无效的 confirm()）
     var deleteArmTimer = null;
-
-    function exitManageMode() {
-        if (!manageMode) return;
-        manageMode = false;
-        document.body.classList.remove('manage-mode');
-        var btn = document.getElementById('manage-btn');
-        btn.textContent = '⚙️';
-        btn.style.background = 'rgba(255,255,255,0.2)';
-    }
 
     function resetDeleteBtn() {
         deleteArmed = false;
@@ -1212,7 +1148,6 @@
         saveConfig();
 
         closeModal('sound-modal');
-        exitManageMode();
         renderCategories();
         renderSounds();
         showToast('已保存');
@@ -1242,7 +1177,6 @@
             delete playingIds[editingSoundId];
             saveConfig();
             closeModal('sound-modal');
-            exitManageMode();
             renderCategories();
             renderSounds();
             showToast('已删除');
@@ -1612,17 +1546,18 @@
     }
 
     // ============================================================
-    // 管理模式
+    // 播放模式切换：叠加（同音效可同时多开）/ 打断（重播立即打断旧实例）
     // ============================================================
 
-    document.getElementById('manage-btn').addEventListener('click', function() {
-        manageMode = !manageMode;
-        document.body.classList.toggle('manage-mode', manageMode);
-        var btn = document.getElementById('manage-btn');
-        btn.textContent = manageMode ? '✓' : '⚙️';
-        btn.style.background = manageMode ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)';
-        renderSounds();
-        showToast(manageMode ? '管理模式：点击 ✏️ 编辑' : '已退出管理模式');
+    var playModeBtn = document.getElementById('play-mode-btn');
+    function updatePlayModeBtn() {
+        playModeBtn.textContent = playOverlap ? '🔀' : '⏮';
+        playModeBtn.style.background = playOverlap ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)';
+        showToast(playOverlap ? '叠加模式' : '打断模式');
+    }
+    playModeBtn.addEventListener('click', function() {
+        playOverlap = !playOverlap;
+        updatePlayModeBtn();
     });
 
     // ============================================================
